@@ -9,6 +9,263 @@
 import SwiftUI
 import SDWebImage
 
+// MARK: - Timeless Code
+
+import Combine
+
+private func createView(image: PlatformImage) -> Image {
+    // Actual rendering SwiftUI image
+    let result: Image
+    // NSImage works well with SwiftUI, include Vector and EXIF images.
+    #if os(macOS)
+    result = Image(nsImage: image)
+    #else
+    // Fix the SwiftUI.Image rendering issue, like when use EXIF UIImage, the `.aspectRatio` does not works. SwiftUI's Bug :)
+    // See issue #101
+    var cgImage: CGImage?
+    // Case 1: Vector Image, draw bitmap image
+    if image.sd_isVector {
+        // ensure CGImage is nil
+        if image.cgImage == nil {
+            // draw vector into bitmap with the screen scale (behavior like AppKit)
+            #if os(iOS) || os(tvOS)
+            let scale = UIScreen.main.scale
+            #else
+            let scale = WKInterfaceDevice.current().screenScale
+            #endif
+            UIGraphicsBeginImageContextWithOptions(image.size, false, scale)
+            image.draw(at: .zero)
+            cgImage = UIGraphicsGetImageFromCurrentImageContext()?.cgImage
+            UIGraphicsEndImageContext()
+        } else {
+            cgImage = image.cgImage
+        }
+    }
+    // Case 2: Image with EXIF orientation (only EXIF 5-8 contains bug)
+    else if [.left, .leftMirrored, .right, .rightMirrored].contains(image.imageOrientation) {
+        cgImage = image.cgImage
+    }
+    // If we have CGImage, use CGImage based API, else use UIImage based API
+    if let cgImage = cgImage {
+        let scale = image.scale
+        let orientation = image.imageOrientation.toSwiftUI
+        result = Image(decorative: cgImage, scale: scale, orientation: orientation)
+    } else {
+        result = Image(uiImage: image)
+    }
+    #endif
+    
+    return result
+}
+
+public class WebImagePlayer: ObservableObject {
+    var subscriptions = Set<AnyCancellable>()
+    let requestersLock = DispatchSemaphore(value: 1)
+    var requestersSet = Set<UUID>()
+    var isPlaying = false
+    
+    var selfId = UUID()
+    
+    @Published var imageManager: ImageManager
+    @Published var currentFrame: PlatformImage?
+    var imagePlayer: SDAnimatedImagePlayer?
+    
+    var runLoopMode: RunLoop.Mode = .common
+    var playbackRate: Double = 1.0
+
+    public func startPlaying(requester: UUID) {
+        requestersLock.wait()
+        requestersSet.insert(requester)
+        if !isPlaying, let imagePlayer = imagePlayer {
+            imagePlayer.startPlaying()
+            isPlaying = true
+        }
+        requestersLock.signal()
+    }
+    
+    public func stopPlaying(requester: UUID) {
+        requestersLock.wait()
+        requestersSet.remove(requester)
+        if isPlaying, requestersSet.count == 0, let imagePlayer = imagePlayer {
+            imagePlayer.stopPlaying()
+            imagePlayer.clearFrameBuffer()
+            isPlaying = false
+        }
+        requestersLock.signal()
+    }
+    
+    func startPlayingIfRequired() {
+        imagePlayer?.startPlaying()
+        requestersLock.wait()
+        if !isPlaying, requestersSet.count > 0, let imagePlayer = imagePlayer {
+            imagePlayer.startPlaying()
+            isPlaying = true
+        }
+        requestersLock.signal()
+    }
+    
+    func registerNestedObservableObject<ObjectType: ObservableObject>(_ obj: ObjectType) {
+        obj.objectWillChange.sink { _ in self.objectWillChange.send() }
+            .store(in: &subscriptions)
+    }
+    
+    public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true) {
+        var context = context ?? [:]
+        
+        if isAnimated, context[.animatedImageClass] == nil {
+            context[.animatedImageClass] = SDAnimatedImage.self
+        }
+
+        imageManager = ImageManager(url: url, options: options, context: context)
+        registerNestedObservableObject(imageManager)
+        
+        imageManager.$image
+            .sink { image in
+                self.setupPlayer(image: image)
+            }
+            .store(in: &subscriptions)
+        
+        imageManager.load()
+    }
+    
+    /// Animated Image Support
+    func setupPlayer(image: PlatformImage?) {
+        if imagePlayer != nil {
+            return
+        }
+        if let animatedImage = image as? SDAnimatedImageProvider {
+            if let imagePlayer = SDAnimatedImagePlayer(provider: animatedImage) {
+                imagePlayer.animationFrameHandler = { (_, frame) in
+                    self.currentFrame = frame
+                }
+                
+                imagePlayer.runLoopMode = runLoopMode
+                imagePlayer.playbackRate = playbackRate
+                
+                self.imagePlayer = imagePlayer
+                startPlayingIfRequired()
+            }
+        }
+    }
+}
+
+public struct WebImagePlayerView: View {
+    var configurations: [(Image) -> Image] = []
+    
+    /// A Binding to control the animation. You can bind external logic to control the animation status.
+    /// True to start animation, false to stop animation.
+    @Binding public var isAnimating: Bool
+    
+    @ObservedObject var player: WebImagePlayer
+    var placeholder: AnyView?
+    
+    public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false)) {
+        _isAnimating = isAnimating
+        self.player = player
+    }
+
+    public var body: some View {
+        return Group {
+            if player.imageManager.image != nil {
+                if isAnimating && player.currentFrame != nil {
+                    configure(image: player.currentFrame!)
+                } else {
+                    configure(image: player.imageManager.image!)
+                }
+            } else {
+                setupPlaceholder()
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    /*
+                     TODO: Support retries and cancels
+                    .onAppear {
+                        // Load remote image when first appear
+                        if self.imageManager.isFirstLoad {
+                            self.imageManager.load()
+                            return
+                        }
+                        guard self.retryOnAppear else { return }
+                        // When using prorgessive loading, the new partial image will cause onAppear. Filter this case
+                        if self.imageManager.image == nil && !self.imageManager.isIncremental {
+                            self.imageManager.load()
+                        }
+                    }
+                    .onDisappear {
+                        guard self.cancelOnDisappear else { return }
+                        // When using prorgessive loading, the previous partial image will cause onDisappear. Filter this case
+                        if self.imageManager.image == nil && !self.imageManager.isIncremental {
+                            self.imageManager.cancel()
+                        }
+                    }
+                    */
+            }
+        }
+    }
+    
+    /// Placeholder View Support
+    func setupPlaceholder() -> some View {
+        // Don't use `Group` because it will trigger `.onAppear` and `.onDisappear` when condition view removed, treat placeholder as an entire component
+        if let placeholder = placeholder {
+            // If use `.delayPlaceholder`, the placeholder is applied after loading failed, hide during loading :)
+            if player.imageManager.options.contains(.delayPlaceholder) && player.imageManager.isLoading {
+                return AnyView(configure(image: .empty))
+            } else {
+                return placeholder
+            }
+        } else {
+            return AnyView(configure(image: .empty))
+        }
+    }
+    
+    /// Configure the platform image into the SwiftUI rendering image
+    func configure(image: PlatformImage) -> Image {
+        // Should not use `EmptyView`, which does not respect to the container's frame modifier
+        // Using a empty image instead for better compatible
+        return configurations.reduce(createView(image: image)) { (previous, configuration) in
+            configuration(previous)
+        }
+    }
+}
+
+// Layout
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+extension WebImagePlayerView {
+    func configure(_ block: @escaping (Image) -> Image) -> WebImagePlayerView {
+        var result = self
+        result.configurations.append(block)
+        return result
+    }
+    
+    /// Configurate this view's image with the specified cap insets and options.
+    /// - Parameter capInsets: The values to use for the cap insets.
+    /// - Parameter resizingMode: The resizing mode
+    public func resizable(
+        capInsets: EdgeInsets = EdgeInsets(),
+        resizingMode: Image.ResizingMode = .stretch) -> WebImagePlayerView
+    {
+        configure { $0.resizable(capInsets: capInsets, resizingMode: resizingMode) }
+    }
+    
+    /// Configurate this view's rendering mode.
+    /// - Parameter renderingMode: The resizing mode
+    public func renderingMode(_ renderingMode: Image.TemplateRenderingMode?) -> WebImagePlayerView {
+        configure { $0.renderingMode(renderingMode) }
+    }
+    
+    /// Configurate this view's image interpolation quality
+    /// - Parameter interpolation: The interpolation quality
+    public func interpolation(_ interpolation: Image.Interpolation) -> WebImagePlayerView {
+        configure { $0.interpolation(interpolation) }
+    }
+    
+    /// Configurate this view's image antialiasing
+    /// - Parameter isAntialiased: Whether or not to allow antialiasing
+    public func antialiased(_ isAntialiased: Bool) -> WebImagePlayerView {
+        configure { $0.antialiased(isAntialiased) }
+    }
+}
+
+// MARK: - SDWebImageSwiftUI Code
+
 /// A Image View type to load image from url. Supports static/animated image format.
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct WebImage : View {
@@ -123,50 +380,9 @@ public struct WebImage : View {
     
     /// Configure the platform image into the SwiftUI rendering image
     func configure(image: PlatformImage) -> some View {
-        // Actual rendering SwiftUI image
-        let result: Image
-        // NSImage works well with SwiftUI, include Vector and EXIF images.
-        #if os(macOS)
-        result = Image(nsImage: image)
-        #else
-        // Fix the SwiftUI.Image rendering issue, like when use EXIF UIImage, the `.aspectRatio` does not works. SwiftUI's Bug :)
-        // See issue #101
-        var cgImage: CGImage?
-        // Case 1: Vector Image, draw bitmap image
-        if image.sd_isVector {
-            // ensure CGImage is nil
-            if image.cgImage == nil {
-                // draw vector into bitmap with the screen scale (behavior like AppKit)
-                #if os(iOS) || os(tvOS)
-                let scale = UIScreen.main.scale
-                #else
-                let scale = WKInterfaceDevice.current().screenScale
-                #endif
-                UIGraphicsBeginImageContextWithOptions(image.size, false, scale)
-                image.draw(at: .zero)
-                cgImage = UIGraphicsGetImageFromCurrentImageContext()?.cgImage
-                UIGraphicsEndImageContext()
-            } else {
-                cgImage = image.cgImage
-            }
-        }
-        // Case 2: Image with EXIF orientation (only EXIF 5-8 contains bug)
-        else if [.left, .leftMirrored, .right, .rightMirrored].contains(image.imageOrientation) {
-            cgImage = image.cgImage
-        }
-        // If we have CGImage, use CGImage based API, else use UIImage based API
-        if let cgImage = cgImage {
-            let scale = image.scale
-            let orientation = image.imageOrientation.toSwiftUI
-            result = Image(decorative: cgImage, scale: scale, orientation: orientation)
-        } else {
-            result = Image(uiImage: image)
-        }
-        #endif
-        
         // Should not use `EmptyView`, which does not respect to the container's frame modifier
         // Using a empty image instead for better compatible
-        return configurations.reduce(result) { (previous, configuration) in
+        return configurations.reduce(createView(image: image)) { (previous, configuration) in
             configuration(previous)
         }
     }
