@@ -7,7 +7,7 @@
 #
 
 Pod::Spec.new do |s|
-  s.name             = 'SDWebImageSwiftUI'
+  s.name             = 'TimelessSDWebImageSwiftUI'
   s.version          = '1.5.0'
   s.summary          = 'SwiftUI Image loading and Animation framework powered by SDWebImage'
 
@@ -16,15 +16,15 @@ SDWebImageSwiftUI is a SwiftUI image loading framework, which based on SDWebImag
 It brings all your favorite features from SDWebImage, like async image loading, memory/disk caching, animated image playback and performances.
                        DESC
 
-  s.homepage         = 'https://github.com/SDWebImage/SDWebImageSwiftUI'
+  s.homepage         = 'https://github.com/timeless-space/TimelessSDWebImageSwiftUI.git'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
   s.author           = { 'DreamPiggy' => 'lizhuoli1126@126.com' }
-  s.source           = { :git => 'https://github.com/SDWebImage/SDWebImageSwiftUI.git', :tag => s.version.to_s }
+  s.source           = { :git => 'https://github.com/timeless-space/TimelessSDWebImageSwiftUI.git', :tag => s.version.to_s }
 
   s.ios.deployment_target = '13.0'
   s.osx.deployment_target = '10.15'
-  s.tvos.deployment_target = '13.0'
-  s.watchos.deployment_target = '6.0'
+  #s.tvos.deployment_target = '13.0'
+  #s.watchos.deployment_target = '6.0'
 
   s.source_files = 'SDWebImageSwiftUI/Classes/**/*', 'SDWebImageSwiftUI/Module/*.h'
   s.pod_target_xcconfig = {
