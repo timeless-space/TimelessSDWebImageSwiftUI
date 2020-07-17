@@ -264,6 +264,31 @@ extension WebImagePlayerView {
     }
 }
 
+// Configuration
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+extension WebImagePlayerView {
+
+    /// Associate a placeholder when loading image with url
+    /// - note: The differences between Placeholder and Indicator, is that placeholder does not supports animation, and return type is different
+    /// - Parameter content: A view that describes the placeholder.
+    public func placeholder<T>(@ViewBuilder content: () -> T) -> WebImagePlayerView where T : View {
+        var result = self
+        result.placeholder = AnyView(content())
+        return result
+    }
+
+    /// Associate a placeholder image when loading image with url
+    /// - note: This placeholder image will apply the same size and resizable from WebImage for convenience. If you don't want this, use the ViewBuilder one above instead
+    /// - Parameter image: A Image view that describes the placeholder.
+    public func placeholder(_ image: Image) -> WebImagePlayerView {
+        return placeholder {
+            configurations.reduce(image) { (previous, configuration) in
+                configuration(previous)
+            }
+        }
+    }
+}
+
 // MARK: - SDWebImageSwiftUI Code
 
 /// A Image View type to load image from url. Supports static/animated image format.
