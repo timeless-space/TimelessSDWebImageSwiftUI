@@ -66,7 +66,7 @@ public class WebImagePlayer: ObservableObject {
     
     var selfId = UUID()
     
-    @Published var imageManager: ImageManager
+    var imageManager: ImageManager
     @Published var currentFrame: PlatformImage?
     var imagePlayer: SDAnimatedImagePlayer?
     
@@ -105,7 +105,7 @@ public class WebImagePlayer: ObservableObject {
     }
     
     func registerNestedObservableObject<ObjectType: ObservableObject>(_ obj: ObjectType) {
-        obj.objectWillChange.sink { _ in self.objectWillChange.send() }
+        obj.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
     }
     
@@ -120,8 +120,8 @@ public class WebImagePlayer: ObservableObject {
         registerNestedObservableObject(imageManager)
         
         imageManager.$image
-            .sink { image in
-                self.setupPlayer(image: image)
+            .sink { [weak self] image in
+                self?.setupPlayer(image: image)
             }
             .store(in: &subscriptions)
         
@@ -135,8 +135,8 @@ public class WebImagePlayer: ObservableObject {
         }
         if let animatedImage = image as? SDAnimatedImageProvider {
             if let imagePlayer = SDAnimatedImagePlayer(provider: animatedImage) {
-                imagePlayer.animationFrameHandler = { (_, frame) in
-                    self.currentFrame = frame
+                imagePlayer.animationFrameHandler = { [weak self] (_, frame) in
+                    self?.currentFrame = frame
                 }
                 
                 imagePlayer.runLoopMode = runLoopMode
