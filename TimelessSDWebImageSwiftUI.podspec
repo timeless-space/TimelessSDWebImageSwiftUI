@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'TimelessSDWebImageSwiftUI'
-  s.version          = '1.5.0-t2'
+  s.version          = '1.5.0-t3'
   s.summary          = 'SwiftUI Image loading and Animation framework powered by SDWebImage'
 
   s.description      = <<-DESC
