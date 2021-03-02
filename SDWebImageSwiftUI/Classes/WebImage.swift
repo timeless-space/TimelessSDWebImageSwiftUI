@@ -63,9 +63,12 @@ public class WebImagePlayer: ObservableObject {
     let requestersLock = DispatchSemaphore(value: 1)
     var requestersSet = Set<UUID>()
     var isPlaying = false
+
     var selfId = UUID()
+
     var isCacheImage = false
     var imageManager: ImageManager
+
     @Published var currentFrame: PlatformImage?
     var imagePlayer: SDAnimatedImagePlayer?
     var cachingId: Set<String> = []
@@ -137,8 +140,10 @@ public class WebImagePlayer: ObservableObject {
                 imagePlayer.animationFrameHandler = { [weak self] (_, frame) in
                     self?.currentFrame = frame
                 }
+
                 imagePlayer.runLoopMode = runLoopMode
                 imagePlayer.playbackRate = playbackRate
+
                 self.imagePlayer = imagePlayer
                 startPlayingIfRequired()
             }
@@ -148,12 +153,15 @@ public class WebImagePlayer: ObservableObject {
 
 public struct WebImagePlayerView: View {
     var configurations: [(Image) -> Image] = []
+
     /// A Binding to control the animation. You can bind external logic to control the animation status.
     /// True to start animation, false to stop animation.
     @Binding public var isAnimating: Bool
+
     @State var show = false
     @ObservedObject var player: WebImagePlayer
     var placeholder: AnyView?
+
     public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false), isSupportDelayForShowingCachingImage: Bool = false, cachingID: String? = nil) {
         _isAnimating = isAnimating
         self.player = player
@@ -305,6 +313,7 @@ extension WebImagePlayerView {
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct WebImage : View {
     var configurations: [(Image) -> Image] = []
+
     var placeholder: AnyView?
     var retryOnAppear: Bool = true
     var cancelOnDisappear: Bool = true
@@ -314,8 +323,10 @@ public struct WebImage : View {
     /// A Binding to control the animation. You can bind external logic to control the animation status.
     /// True to start animation, false to stop animation.
     @Binding public var isAnimating: Bool
+
     @State var currentFrame: PlatformImage? = nil
     @State var imagePlayer: SDAnimatedImagePlayer? = nil
+
     var maxBufferSize: UInt?
     var customLoopCount: UInt?
     var runLoopMode: RunLoop.Mode = .common
