@@ -22,23 +22,30 @@ public final class ImageManager : ObservableObject {
     /// loading error, you can grab the error code and reason listed in `SDWebImageErrorDomain`, to provide a user interface about the error reason
     @Published public var error: Error?
     /// whether network is loading or cache is querying, should only be used for indicator binding
-    @Published public var isLoading: Bool = false
+    @Published public var isLoading: Bool = false {
+        didSet {
+            if isLoading == false && image == nil {
+                isLoading = true
+            }
+        }
+    }
     /// network progress, should only be used for indicator binding
     @Published public var progress: Double = 0
     /// true means during incremental loading
     @Published public var isIncremental: Bool = false
-    
+
     var manager: SDWebImageManager
     weak var currentOperation: SDWebImageOperation? = nil
     var isFirstLoad: Bool = true // false after first call `load()`
-    
+
+    var isSupportDelayForShowingCachingImage: Bool = false
     var url: URL?
     var options: SDWebImageOptions
     var context: [SDWebImageContextOption : Any]?
     var successBlock: ((PlatformImage, Data?, SDImageCacheType) -> Void)?
     var failureBlock: ((Error) -> Void)?
     var progressBlock: ((Int, Int) -> Void)?
-    
+
     /// Create a image manager for loading the specify url, with custom options and context.
     /// - Parameter url: The image url
     /// - Parameter options: The options to use when downloading the image. See `SDWebImageOptions` for the possible values.
@@ -53,7 +60,7 @@ public final class ImageManager : ObservableObject {
             self.manager = .shared
         }
     }
-    
+
     /// Start to load the url operation
     public func load() {
         isFirstLoad = false
@@ -61,6 +68,8 @@ public final class ImageManager : ObservableObject {
             return
         }
         self.isLoading = true
+        let loadingTime = Date().timeIntervalSince1970
+
         currentOperation = manager.loadImage(with: url, options: options, context: context, progress: { [weak self] (receivedSize, expectedSize, _) in
             guard let self = self else {
                 return
@@ -86,23 +95,37 @@ public final class ImageManager : ObservableObject {
                 // So previous View struct call `onDisappear` and cancel the currentOperation
                 return
             }
-            self.image = image
-            self.error = error
-            self.isIncremental = !finished
-            if finished {
-                self.imageData = data
-                self.cacheType = cacheType
-                self.isLoading = false
-                self.progress = 1
-                if let image = image {
-                    self.successBlock?(image, data, cacheType)
-                } else {
-                    self.failureBlock?(error ?? NSError())
+
+            func logic() {
+                self.error = error
+                self.isIncremental = !finished
+                if finished {
+                    self.imageData = data
+                    self.cacheType = cacheType
+                    withAnimation(.easeIn) {
+                        self.isLoading = false
+                    }
+                    self.progress = 1
+                    if let image = image {
+                        self.successBlock?(image, data, cacheType)
+                    } else {
+                        self.failureBlock?(error ?? NSError())
+                    }
                 }
+                withAnimation(.easeIn) {
+                    self.image = image
+                }
+            }
+            if self.isSupportDelayForShowingCachingImage && Date().timeIntervalSince1970 - loadingTime < 0.5 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    logic()
+                }
+            } else {
+                logic()
             }
         }
     }
-    
+
     /// Cancel the current url loading
     public func cancel() {
         if let operation = currentOperation {
@@ -111,7 +134,7 @@ public final class ImageManager : ObservableObject {
             isLoading = false
         }
     }
-    
+
 }
 
 // Completion Handler
@@ -122,7 +145,7 @@ extension ImageManager {
     public func setOnFailure(perform action: ((Error) -> Void)? = nil) {
         self.failureBlock = action
     }
-    
+
     /// Provide the action when image load successes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the loaded image. If `action` is `nil`, the call has no effect.
@@ -131,7 +154,7 @@ extension ImageManager {
             action(image)
         }
     }
-    
+
     /// Provide the action when image load successes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the loaded image, the second arg is the cache type loaded from. If `action` is `nil`, the call has no effect.
@@ -140,14 +163,14 @@ extension ImageManager {
             action(image, cacheType)
         }
     }
-    
+
     /// Provide the action when image load successes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the loaded image, the second arg is the loaded image data, the third arg is the cache type loaded from. If `action` is `nil`, the call has no effect.
     public func setOnSuccess(perform action: ((PlatformImage, Data?, SDImageCacheType) -> Void)? = nil) {
         self.successBlock = action
     }
-    
+
     /// Provide the action when image load progress changes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the received size, the second arg is the total size, all in bytes. If `action` is `nil`, the call has no effect.
