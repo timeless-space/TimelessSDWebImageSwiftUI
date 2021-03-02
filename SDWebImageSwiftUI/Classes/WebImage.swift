@@ -500,7 +500,7 @@ extension WebImage {
 // Completion Handler
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 extension WebImage {
-
+    
     /// Provide the action when image load fails.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the error during loading. If `action` is `nil`, the call has no effect.
@@ -509,7 +509,7 @@ extension WebImage {
         self.imageManager.failureBlock = action
         return self
     }
-
+    
     /// Provide the action when image load successes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the loaded image. If `action` is `nil`, the call has no effect.
@@ -521,7 +521,7 @@ extension WebImage {
         }
         return self
     }
-
+    
     /// Provide the action when image load successes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the loaded image, the second arg is the cache type loaded from. If `action` is `nil`, the call has no effect.
@@ -532,7 +532,7 @@ extension WebImage {
         }
         return self
     }
-
+    
     /// Provide the action when image load successes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the loaded image, the second arg is the loaded image data, the third arg is the cache type loaded from. If `action` is `nil`, the call has no effect.
@@ -541,7 +541,7 @@ extension WebImage {
         self.imageManager.successBlock = action
         return self
     }
-
+    
     /// Provide the action when image load progress changes.
     /// - Parameters:
     ///   - action: The action to perform. The first arg is the received size, the second arg is the total size, all in bytes. If `action` is `nil`, the call has no effect.
@@ -602,7 +602,7 @@ extension WebImage {
     public func indicator<T>(_ indicator: Indicator<T>) -> some View where T : View {
         return self.modifier(IndicatorViewModifier(reporter: imageManager, indicator: indicator))
     }
-
+    
     /// Associate a indicator when loading image with url, convenient method with block
     /// - Parameter content: A view that describes the indicator.
     public func indicator<T>(@ViewBuilder content: @escaping (_ isAnimating: Binding<Bool>, _ progress: Binding<Double>) -> T) -> some View where T : View {
