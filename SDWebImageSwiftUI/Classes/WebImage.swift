@@ -110,20 +110,20 @@ public class WebImagePlayer: ObservableObject {
     
     public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true, isCacheImage: Bool = false) {
         var context = context ?? [:]
-
+        
         if isAnimated, context[.animatedImageClass] == nil {
             context[.animatedImageClass] = SDAnimatedImage.self
         }
         self.isCacheImage = isCacheImage
         imageManager = ImageManager(url: url, options: options, context: context)
         registerNestedObservableObject(imageManager)
-
+        
         imageManager.$image
             .sink { [weak self] image in
                 self?.setupPlayer(image: image)
             }
             .store(in: &subscriptions)
-
+        
         imageManager.load()
     }
     
@@ -451,7 +451,7 @@ public struct WebImage : View {
                 }
                 imagePlayer.runLoopMode = runLoopMode
                 imagePlayer.playbackRate = playbackRate
-
+                
                 self.imagePlayer = imagePlayer
                 imagePlayer.startPlaying()
             }
