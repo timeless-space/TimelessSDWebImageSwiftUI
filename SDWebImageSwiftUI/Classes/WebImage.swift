@@ -102,12 +102,12 @@ public class WebImagePlayer: ObservableObject {
         }
         requestersLock.signal()
     }
-
+    
     func registerNestedObservableObject<ObjectType: ObservableObject>(_ obj: ObjectType) {
         obj.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
     }
-
+    
     public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true, isCacheImage: Bool = false) {
         var context = context ?? [:]
 
@@ -126,7 +126,7 @@ public class WebImagePlayer: ObservableObject {
 
         imageManager.load()
     }
-
+    
     /// Animated Image Support
     func setupPlayer(image: PlatformImage?) {
         if imagePlayer != nil {
@@ -137,10 +137,8 @@ public class WebImagePlayer: ObservableObject {
                 imagePlayer.animationFrameHandler = { [weak self] (_, frame) in
                     self?.currentFrame = frame
                 }
-
                 imagePlayer.runLoopMode = runLoopMode
                 imagePlayer.playbackRate = playbackRate
-
                 self.imagePlayer = imagePlayer
                 startPlayingIfRequired()
             }
@@ -150,14 +148,12 @@ public class WebImagePlayer: ObservableObject {
 
 public struct WebImagePlayerView: View {
     var configurations: [(Image) -> Image] = []
-
     /// A Binding to control the animation. You can bind external logic to control the animation status.
     /// True to start animation, false to stop animation.
     @Binding public var isAnimating: Bool
     @State var show = false
     @ObservedObject var player: WebImagePlayer
     var placeholder: AnyView?
-
     public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false), isSupportDelayForShowingCachingImage: Bool = false, cachingID: String? = nil) {
         _isAnimating = isAnimating
         self.player = player
@@ -185,7 +181,6 @@ public struct WebImagePlayerView: View {
             } else {
                 setupPlaceholder()
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-
                     /*
                      TODO: Support retries and cancels
                     .onAppear {
@@ -216,7 +211,6 @@ public struct WebImagePlayerView: View {
             }
         }
     }
-
     /// Placeholder View Support
     func setupPlaceholder() -> some View {
         // Don't use `Group` because it will trigger `.onAppear` and `.onDisappear` when condition view removed, treat placeholder as an entire component
@@ -230,7 +224,6 @@ public struct WebImagePlayerView: View {
             return AnyView(configure(image: .empty))
         }
     }
-
     /// Configure the platform image into the SwiftUI rendering image
     func configure(image: PlatformImage) -> Image {
         // Should not use `EmptyView`, which does not respect to the container's frame modifier
@@ -249,7 +242,6 @@ extension WebImagePlayerView {
         result.configurations.append(block)
         return result
     }
-
     /// Configurate this view's image with the specified cap insets and options.
     /// - Parameter capInsets: The values to use for the cap insets.
     /// - Parameter resizingMode: The resizing mode
@@ -259,19 +251,16 @@ extension WebImagePlayerView {
     {
         configure { $0.resizable(capInsets: capInsets, resizingMode: resizingMode) }
     }
-
     /// Configurate this view's rendering mode.
     /// - Parameter renderingMode: The resizing mode
     public func renderingMode(_ renderingMode: Image.TemplateRenderingMode?) -> WebImagePlayerView {
         configure { $0.renderingMode(renderingMode) }
     }
-
     /// Configurate this view's image interpolation quality
     /// - Parameter interpolation: The interpolation quality
     public func interpolation(_ interpolation: Image.Interpolation) -> WebImagePlayerView {
         configure { $0.interpolation(interpolation) }
     }
-
     /// Configurate this view's image antialiasing
     /// - Parameter isAntialiased: Whether or not to allow antialiasing
     public func antialiased(_ isAntialiased: Bool) -> WebImagePlayerView {
@@ -310,7 +299,6 @@ extension WebImagePlayerView {
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct WebImage : View {
     var configurations: [(Image) -> Image] = []
-
     var placeholder: AnyView?
     var retryOnAppear: Bool = true
     var cancelOnDisappear: Bool = true
@@ -320,10 +308,8 @@ public struct WebImage : View {
     /// A Binding to control the animation. You can bind external logic to control the animation status.
     /// True to start animation, false to stop animation.
     @Binding public var isAnimating: Bool
-
     @State var currentFrame: PlatformImage? = nil
     @State var imagePlayer: SDAnimatedImagePlayer? = nil
-
     var maxBufferSize: UInt?
     var customLoopCount: UInt?
     var runLoopMode: RunLoop.Mode = .common
@@ -338,7 +324,6 @@ public struct WebImage : View {
     public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil) {
         self.init(url: url, options: options, context: context, isAnimating: .constant(false))
     }
-
     /// Create a web image with url, placeholder, custom options and context. Optional can support animated image using Binding.
     /// - Parameter url: The image url
     /// - Parameter options: The options to use when downloading the image. See `SDWebImageOptions` for the possible values.
@@ -355,7 +340,6 @@ public struct WebImage : View {
         }
         self.imageManager = ImageManager(url: url, options: options, context: context)
     }
-
     public var body: some View {
         // This solve the case when WebImage created with new URL, but `onAppear` not been called, for example, some transaction indeterminate state, SwiftUI :)
         if imageManager.isFirstLoad {
@@ -417,7 +401,6 @@ public struct WebImage : View {
             }
         }
     }
-
     /// Configure the platform image into the SwiftUI rendering image
     func configure(image: PlatformImage) -> some View {
         // Should not use `EmptyView`, which does not respect to the container's frame modifier
@@ -426,7 +409,6 @@ public struct WebImage : View {
             configuration(previous)
         }
     }
-
     /// Placeholder View Support
     func setupPlaceholder() -> some View {
         if imageManager.isLoading, #available(iOS 14.0, *) {
@@ -439,7 +421,6 @@ public struct WebImage : View {
             return AnyView(configure(image: .empty))
         }
     }
-
     /// Animated Image Support
     func setupPlayer(image: PlatformImage?) {
         if imagePlayer != nil {
