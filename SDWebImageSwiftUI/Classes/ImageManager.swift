@@ -68,7 +68,6 @@ public final class ImageManager : ObservableObject {
         }
         self.isLoading = true
         let loadingTime = Date().timeIntervalSince1970
-
         currentOperation = manager.loadImage(with: url, options: options, context: context, progress: { [weak self] (receivedSize, expectedSize, _) in
             guard let self = self else {
                 return

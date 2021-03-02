@@ -71,7 +71,7 @@ public class WebImagePlayer: ObservableObject {
     var cachingId: Set<String> = []
     var runLoopMode: RunLoop.Mode = .common
     var playbackRate: Double = 1.0
-    
+
     public func startPlaying(requester: UUID) {
         requestersLock.wait()
         requestersSet.insert(requester)
@@ -167,7 +167,7 @@ public struct WebImagePlayerView: View {
         }
         self.player.imageManager.isSupportDelayForShowingCachingImage = isSupportDelayForShowingCachingImage
     }
-    
+
     public var body: some View {
         return Group {
             if player.imageManager.image != nil {
