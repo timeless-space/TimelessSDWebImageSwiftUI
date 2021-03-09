@@ -38,6 +38,7 @@ public final class ImageManager : ObservableObject {
     weak var currentOperation: SDWebImageOperation? = nil
     var isFirstLoad: Bool = true // false after first call `load()`
     var isSupportDelayForShowingCachingImage: Bool = false
+    var minFakeLoadingDelay = 0.5
     var url: URL?
     var options: SDWebImageOptions
     var context: [SDWebImageContextOption : Any]?
@@ -114,8 +115,8 @@ public final class ImageManager : ObservableObject {
                     self.image = image
                 }
             }
-            if self.isSupportDelayForShowingCachingImage && Date().timeIntervalSince1970 - loadingTime < 0.5 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if self.isSupportDelayForShowingCachingImage && Date().timeIntervalSince1970 - loadingTime < minFakeLoadingDelay {
+                DispatchQueue.main.asyncAfter(deadline: .now() + minFakeLoadingDelay) {
                     logic()
                 }
             } else {

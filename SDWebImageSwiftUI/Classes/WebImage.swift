@@ -66,12 +66,12 @@ public class WebImagePlayer: ObservableObject {
     
     var selfId = UUID()
     
-    var isCacheImage = false
+    var supportsFakeLoadingDelay = false
     var imageManager: ImageManager
     
     @Published var currentFrame: PlatformImage?
     var imagePlayer: SDAnimatedImagePlayer?
-    var cachingId: Set<String> = []
+    var loadedPlayerViewIDs: Set<String> = []
     var runLoopMode: RunLoop.Mode = .common
     var playbackRate: Double = 1.0
 
@@ -111,13 +111,13 @@ public class WebImagePlayer: ObservableObject {
             .store(in: &subscriptions)
     }
     
-    public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true, isCacheImage: Bool = false) {
+    public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true, supportsFakeLoadingDelay: Bool = false) {
         var context = context ?? [:]
         
         if isAnimated, context[.animatedImageClass] == nil {
             context[.animatedImageClass] = SDAnimatedImage.self
         }
-        self.isCacheImage = isCacheImage
+        self.supportsFakeLoadingDelay = supportsFakeLoadingDelay
         imageManager = ImageManager(url: url, options: options, context: context)
         registerNestedObservableObject(imageManager)
         
@@ -162,18 +162,19 @@ public struct WebImagePlayerView: View {
     @ObservedObject var player: WebImagePlayer
     var placeholder: AnyView?
     
-    public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false), isSupportDelayForShowingCachingImage: Bool = false, cachingID: String? = nil) {
+    public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false), isSupportDelayForShowingCachingImage: Bool = false, minFakeLoadingDelay: Double = 0.5, playerViewID: String? = nil) {
         _isAnimating = isAnimating
         self.player = player
-        if let cachingID = cachingID, !player.cachingId.contains(cachingID) {
-            if isSupportDelayForShowingCachingImage && player.imageManager.image != nil, !player.isCacheImage {
+        if let playerViewID = playerViewID, !player.loadedPlayerViewIDs.contains(playerViewID) {
+            if isSupportDelayForShowingCachingImage && player.imageManager.image != nil, !player.supportsFakeLoadingDelay {
                 player.imageManager.image = nil
                 player.imageManager.isFirstLoad = true
                 player.imageManager.isLoading = true
             }
-            player.cachingId.insert(cachingID)
+            player.loadedPlayerViewIDs.insert(playerViewID)
         }
-        self.player.imageManager.isSupportDelayForShowingCachingImage = isSupportDelayForShowingCachingImage
+        self.player.imageManager.isSupportDelayForShowingCachingImage = isSupportDelayForShowingCachingImage || self.player.imageManager.isSupportDelayForShowingCachingImage
+        self.player.imageManager.minFakeLoadingDelay = max(minFakeLoadingDelay, self.player.imageManager.minFakeLoadingDelay)
     }
 
     public var body: some View {
