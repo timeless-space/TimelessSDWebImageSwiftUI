@@ -22,7 +22,13 @@ public final class ImageManager : ObservableObject {
     /// loading error, you can grab the error code and reason listed in `SDWebImageErrorDomain`, to provide a user interface about the error reason
     @Published public var error: Error?
     /// whether network is loading or cache is querying, should only be used for indicator binding
-    @Published public var isLoading: Bool = false
+    @Published public var isLoading: Bool = false {
+        didSet {
+            if isLoading == false && image == nil {
+                isLoading = true
+            }
+        }
+    }
     /// network progress, should only be used for indicator binding
     @Published public var progress: Double = 0
     /// true means during incremental loading
@@ -31,7 +37,8 @@ public final class ImageManager : ObservableObject {
     var manager: SDWebImageManager
     weak var currentOperation: SDWebImageOperation? = nil
     var isFirstLoad: Bool = true // false after first call `load()`
-    
+    var isSupportDelayForShowingCachingImage: Bool = false
+    var minFakeLoadingDelay = 0.5
     var url: URL?
     var options: SDWebImageOptions
     var context: [SDWebImageContextOption : Any]?
@@ -61,6 +68,7 @@ public final class ImageManager : ObservableObject {
             return
         }
         self.isLoading = true
+        let loadingTime = Date().timeIntervalSince1970
         currentOperation = manager.loadImage(with: url, options: options, context: context, progress: { [weak self] (receivedSize, expectedSize, _) in
             guard let self = self else {
                 return
@@ -86,19 +94,33 @@ public final class ImageManager : ObservableObject {
                 // So previous View struct call `onDisappear` and cancel the currentOperation
                 return
             }
-            self.image = image
-            self.error = error
-            self.isIncremental = !finished
-            if finished {
-                self.imageData = data
-                self.cacheType = cacheType
-                self.isLoading = false
-                self.progress = 1
-                if let image = image {
-                    self.successBlock?(image, data, cacheType)
-                } else {
-                    self.failureBlock?(error ?? NSError())
+
+            func logic() {
+                self.error = error
+                self.isIncremental = !finished
+                if finished {
+                    self.imageData = data
+                    self.cacheType = cacheType
+                    withAnimation(.easeIn) {
+                        self.isLoading = false
+                    }
+                    self.progress = 1
+                    if let image = image {
+                        self.successBlock?(image, data, cacheType)
+                    } else {
+                        self.failureBlock?(error ?? NSError())
+                    }
                 }
+                withAnimation(.easeIn) {
+                    self.image = image
+                }
+            }
+            if self.isSupportDelayForShowingCachingImage && Date().timeIntervalSince1970 - loadingTime < minFakeLoadingDelay {
+                DispatchQueue.main.asyncAfter(deadline: .now() + minFakeLoadingDelay) {
+                    logic()
+                }
+            } else {
+                logic()
             }
         }
     }

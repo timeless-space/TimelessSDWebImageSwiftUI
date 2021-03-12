@@ -66,10 +66,12 @@ public class WebImagePlayer: ObservableObject {
     
     var selfId = UUID()
     
+    var supportsFakeLoadingDelay = false
     var imageManager: ImageManager
+    
     @Published var currentFrame: PlatformImage?
     var imagePlayer: SDAnimatedImagePlayer?
-    
+    var loadedPlayerViewIDs: Set<String> = []
     var runLoopMode: RunLoop.Mode = .common
     var playbackRate: Double = 1.0
 
@@ -109,13 +111,13 @@ public class WebImagePlayer: ObservableObject {
             .store(in: &subscriptions)
     }
     
-    public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true) {
+    public init(url: URL?, options: SDWebImageOptions = [], context: [SDWebImageContextOption : Any]? = nil, isAnimated: Bool = true, supportsFakeLoadingDelay: Bool = false) {
         var context = context ?? [:]
         
         if isAnimated, context[.animatedImageClass] == nil {
             context[.animatedImageClass] = SDAnimatedImage.self
         }
-
+        self.supportsFakeLoadingDelay = supportsFakeLoadingDelay
         imageManager = ImageManager(url: url, options: options, context: context)
         registerNestedObservableObject(imageManager)
         
@@ -156,12 +158,23 @@ public struct WebImagePlayerView: View {
     /// True to start animation, false to stop animation.
     @Binding public var isAnimating: Bool
     
+    @State var show = false
     @ObservedObject var player: WebImagePlayer
     var placeholder: AnyView?
     
-    public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false)) {
+    public init(player: WebImagePlayer, isAnimating: Binding<Bool> = .constant(false), isSupportDelayForShowingCachingImage: Bool = false, minFakeLoadingDelay: Double = 0.5, playerViewID: String? = nil) {
         _isAnimating = isAnimating
         self.player = player
+        if let playerViewID = playerViewID, !player.loadedPlayerViewIDs.contains(playerViewID) {
+            if isSupportDelayForShowingCachingImage && player.imageManager.image != nil, !player.supportsFakeLoadingDelay {
+                player.imageManager.image = nil
+                player.imageManager.isFirstLoad = true
+                player.imageManager.isLoading = true
+            }
+            player.loadedPlayerViewIDs.insert(playerViewID)
+        }
+        self.player.imageManager.isSupportDelayForShowingCachingImage = isSupportDelayForShowingCachingImage || self.player.imageManager.isSupportDelayForShowingCachingImage
+        self.player.imageManager.minFakeLoadingDelay = max(minFakeLoadingDelay, self.player.imageManager.minFakeLoadingDelay)
     }
 
     public var body: some View {
@@ -169,8 +182,10 @@ public struct WebImagePlayerView: View {
             if player.imageManager.image != nil {
                 if isAnimating && player.currentFrame != nil {
                     configure(image: player.currentFrame!)
+                        .transition(.opacity)
                 } else {
                     configure(image: player.imageManager.image!)
+                        .transition(.opacity)
                 }
             } else {
                 setupPlaceholder()
@@ -199,18 +214,22 @@ public struct WebImagePlayerView: View {
                     */
             }
         }
+        .onAppear {
+            if player.imageManager.isFirstLoad {
+                player.imageManager.load()
+            }
+        }
     }
     
     /// Placeholder View Support
     func setupPlaceholder() -> some View {
         // Don't use `Group` because it will trigger `.onAppear` and `.onDisappear` when condition view removed, treat placeholder as an entire component
-        if let placeholder = placeholder {
-            // If use `.delayPlaceholder`, the placeholder is applied after loading failed, hide during loading :)
-            if player.imageManager.options.contains(.delayPlaceholder) && player.imageManager.isLoading {
-                return AnyView(configure(image: .empty))
-            } else {
-                return placeholder
-            }
+        if player.imageManager.isLoading, #available(iOS 14.0, *) {
+            return AnyView(ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                .transition(.opacity))
+        } else if let placeholder = placeholder {
+            return AnyView(placeholder.transition(.opacity))
         } else {
             return AnyView(configure(image: .empty))
         }
@@ -414,14 +433,12 @@ public struct WebImage : View {
     
     /// Placeholder View Support
     func setupPlaceholder() -> some View {
-        // Don't use `Group` because it will trigger `.onAppear` and `.onDisappear` when condition view removed, treat placeholder as an entire component
-        if let placeholder = placeholder {
-            // If use `.delayPlaceholder`, the placeholder is applied after loading failed, hide during loading :)
-            if imageManager.options.contains(.delayPlaceholder) && imageManager.isLoading {
-                return AnyView(configure(image: .empty))
-            } else {
-                return placeholder
-            }
+        if imageManager.isLoading, #available(iOS 14.0, *) {
+            return AnyView(ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                .transition(.opacity))
+        } else if let placeholder = placeholder {
+            return AnyView(placeholder)
         } else {
             return AnyView(configure(image: .empty))
         }
