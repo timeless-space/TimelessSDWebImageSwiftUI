@@ -115,8 +115,8 @@ public final class ImageManager : ObservableObject {
                     self.image = image
                 }
             }
-            if self.isSupportDelayForShowingCachingImage && Date().timeIntervalSince1970 - loadingTime < minFakeLoadingDelay {
-                DispatchQueue.main.asyncAfter(deadline: .now() + minFakeLoadingDelay) {
+            if self.isSupportDelayForShowingCachingImage && Date().timeIntervalSince1970 - loadingTime < self.minFakeLoadingDelay {
+                DispatchQueue.main.asyncAfter(deadline: .now() + self.minFakeLoadingDelay) {
                     logic()
                 }
             } else {

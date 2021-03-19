@@ -21,8 +21,8 @@ It brings all your favorite features from SDWebImage, like async image loading, 
   s.author           = { 'DreamPiggy' => 'lizhuoli1126@126.com' }
   s.source           = { :git => 'https://github.com/timeless-space/TimelessSDWebImageSwiftUI.git', :tag => s.version.to_s }
 
-  s.ios.deployment_target = '13.0'
-  s.osx.deployment_target = '10.15'
+  s.ios.deployment_target = '14.0'
+  s.osx.deployment_target = '11.00'
   #s.tvos.deployment_target = '13.0'
   #s.watchos.deployment_target = '6.0'
 
@@ -35,5 +35,5 @@ It brings all your favorite features from SDWebImage, like async image loading, 
 
   s.weak_frameworks = 'SwiftUI', 'Combine'
   s.dependency 'SDWebImage', '~> 5.7'
-  s.swift_version = '5.1'
+  s.swift_version = '5.0'
 end
